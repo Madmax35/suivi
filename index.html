@@ -26,14 +26,47 @@
   .profile img {
     width: 100%; height: 100%; object-fit: cover;
   }
+  .btn-group {
+    display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;
+  }
+  .btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    background: #333;
+    color: #ddd;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    user-select: none;
+  }
+  .btn.active, .btn:hover {
+    background: #555;
+  }
+  #inputRow {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
   #followersInput {
-    width: calc(100% - 100px);
-    padding: 10px; border-radius: 8px; border: none; font-size: 16px; color: #222;
+    width: 150px;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 16px;
+    color: #222;
     outline: none;
   }
   #addFollowerBtn {
-    width: 90px; background: #444; color: #ddd; border: none; border-radius: 8px;
-    font-weight: bold; font-size: 16px; cursor: pointer; margin-left: 10px;
+    width: 90px;
+    background: #444;
+    color: #ddd;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
     transition: background 0.3s ease;
   }
   #addFollowerBtn:hover {
@@ -66,8 +99,18 @@
   <div class="container">
     <h1>KX CHR Followers Instagram</h1>
     <div class="profile"><img src="profile.jpg" alt="KX CHR Profile" /></div>
-    <input id="followersInput" type="number" placeholder="Nombre d'abonnés aujourd'hui" />
-    <button id="addFollowerBtn">Ajouter</button>
+    
+    <div class="btn-group">
+      <button class="btn active" data-range="7">1 semaine</button>
+      <button class="btn" data-range="30">1 mois</button>
+      <button class="btn" data-range="365">1 an</button>
+    </div>
+    
+    <div id="inputRow">
+      <input id="followersInput" type="number" placeholder="Nombre d'abonnés" />
+      <button id="addFollowerBtn">Ajouter</button>
+    </div>
+    
     <ul id="followersHistory"></ul>
     <canvas id="followersChart"></canvas>
     <div class="stats" id="statsContainer"></div>
@@ -89,15 +132,28 @@ let followersData = [
   { date: "2025-08-10", followers: 37817 }
 ];
 
+let currentRange = 365;
+
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
+function filterByRange(data, days) {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - days);
+  return data.filter(d => {
+    const dt = new Date(d.date);
+    return dt >= startDate && dt <= endDate;
+  });
+}
+
 function updateHistory() {
   const ul = document.getElementById("followersHistory");
   ul.innerHTML = "";
-  followersData.slice().reverse().forEach(entry => {
+  const filteredData = filterByRange(followersData, currentRange);
+  filteredData.slice().reverse().forEach(entry => {
     const li = document.createElement("li");
     li.textContent = formatDate(entry.date);
     const span = document.createElement("span");
@@ -112,13 +168,14 @@ let chart;
 
 function updateChart() {
   if (chart) chart.destroy();
+  const filteredData = filterByRange(followersData, currentRange);
   chart = new Chart(ctx, {
     type: "line",
     data: {
-      labels: followersData.map(d => d.date),
+      labels: filteredData.map(d => formatDate(d.date)),
       datasets: [{
         label: "Followers",
-        data: followersData.map(d => d.followers),
+        data: filteredData.map(d => d.followers),
         borderColor: "#ddd",
         backgroundColor: "rgba(221, 221, 221, 0.3)",
         fill: true,
@@ -140,17 +197,29 @@ function updateChart() {
 }
 
 function calculateStats() {
-  if (followersData.length < 2) return { gain: 0 };
+  const filteredData = filterByRange(followersData, currentRange);
+  if (filteredData.length < 2) return { gain: 0 };
   return {
-    gain: followersData[followersData.length - 1].followers - followersData[0].followers
+    gain: filteredData[filteredData.length - 1].followers - filteredData[0].followers
   };
 }
 
 function updateStats() {
   const stats = calculateStats();
   const container = document.getElementById("statsContainer");
-  container.innerHTML = `<div>Gain total abonnés : <strong>${stats.gain.toLocaleString("fr-FR")}</strong></div>`;
+  container.innerHTML = `<div>Gain total abonnés sur la période : <strong>${stats.gain.toLocaleString("fr-FR")}</strong></div>`;
 }
+
+document.querySelectorAll(".btn").forEach(btn => {
+  btn.addEventListener("click", e => {
+    document.querySelectorAll(".btn").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    currentRange = parseInt(e.target.dataset.range);
+    updateHistory();
+    updateChart();
+    updateStats();
+  });
+});
 
 document.getElementById("addFollowerBtn").addEventListener("click", () => {
   const input = document.getElementById("followersInput");
@@ -160,7 +229,6 @@ document.getElementById("addFollowerBtn").addEventListener("click", () => {
     return;
   }
   const todayStr = new Date().toISOString().slice(0, 10);
-  // Ajoute ou met à jour la donnée du jour
   const existingIndex = followersData.findIndex(d => d.date === todayStr);
   if (existingIndex !== -1) {
     followersData[existingIndex].followers = val;
