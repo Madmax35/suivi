@@ -6,72 +6,119 @@
 <title>Suivi Followers Instagram - KX CHR</title>
 <style>
   body {
-    background: #121212;
-    color: #ddd;
+    margin: 0; background: #121212; color: #ddd;
     font-family: Arial, sans-serif;
-    margin: 0; padding: 20px;
-    display: flex; justify-content: center;
+    display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 20px;
   }
   .container {
-    max-width: 600px; width: 100%;
-    background: #1e1e1e;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 0 20px #555;
-    text-align: center;
+    max-width: 900px; width: 100%;
+    background: #1e1e1e; border-radius: 15px; padding: 20px;
+    box-shadow: 0 0 20px #666;
   }
-  input, button {
-    font-size: 1rem;
-    padding: 0.6em 1em;
+  h1 {
+    text-align: center; color: #ccc; margin-bottom: 20px;
+    font-weight: normal;
+  }
+  .profile {
+    width: 120px; height: 120px; border-radius: 50%; overflow: hidden; margin: 0 auto 20px;
+    border: 3px solid #666;
+  }
+  .profile img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .btn-group {
+    display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;
+  }
+  .btn {
+    padding: 8px 18px;
     border-radius: 8px;
-    border: none;
-    margin: 0.5em 0.2em;
-  }
-  input {
-    width: 140px;
-    color: #222;
-  }
-  button {
-    background: #444;
+    background: #333;
     color: #ddd;
+    border: none;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: background 0.3s ease;
+    user-select: none;
   }
-  button:hover {
-    background: #666;
+  .btn.active, .btn:hover {
+    background: #555;
   }
-  #shareLink {
-    margin-top: 15px;
-    word-break: break-all;
-    background: #222;
+  #inputRow {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  #followersInput {
+    width: 150px;
     padding: 10px;
     border-radius: 8px;
-    user-select: all;
+    border: none;
+    font-size: 16px;
+    color: #222;
+    outline: none;
+  }
+  #addFollowerBtn {
+    width: 90px;
+    background: #444;
+    color: #ddd;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  #addFollowerBtn:hover {
+    background: #666;
+  }
+  #followersHistory {
+    margin-top: 20px; max-height: 160px; overflow-y: auto;
+    border: 1px solid #444; border-radius: 8px; padding: 10px;
+    background: #222; font-size: 14px;
+    color: #ccc;
+  }
+  #followersHistory li {
+    display: flex; justify-content: space-between; padding: 4px 0;
+    border-bottom: 1px solid #333;
+  }
+  #followersHistory li:last-child {
+    border-bottom: none;
   }
   canvas {
-    margin: 10px auto;
-    border-radius: 12px;
-    background: #222;
+    display: block; width: 100%; max-height: 350px; margin-top: 20px;
+  }
+  .stats {
+    margin-top: 15px; font-weight: bold; font-size: 16px;
+    color: #bbb;
+    text-align: center;
   }
 </style>
 </head>
 <body>
   <div class="container">
     <h1>KX CHR Followers Instagram</h1>
-
-    <input id="followersInput" type="number" placeholder="Nombre d'abonnés" />
-    <button id="addFollowerBtn">Ajouter</button>
-    <button id="shareBtn">Partagez</button>
-
-    <ul id="followersHistory" style="text-align:left; max-height: 150px; overflow-y: auto; margin-top: 20px;"></ul>
-    <canvas id="followersChart" width="400" height="200"></canvas>
+    <div class="profile"><img src="profile.jpg" alt="KX CHR Profile" /></div>
     
-    <div id="shareLink" style="display:none;"></div>
+    <div class="btn-group">
+      <button class="btn active" data-range="7">1 semaine</button>
+      <button class="btn" data-range="30">1 mois</button>
+      <button class="btn" data-range="365">1 an</button>
+    </div>
+    
+    <div id="inputRow">
+      <input id="followersInput" type="number" placeholder="Nombre d'abonnés" />
+      <button id="addFollowerBtn">Ajouter</button>
+    </div>
+    
+    <ul id="followersHistory"></ul>
+    <canvas id="followersChart"></canvas>
+    <div class="stats" id="statsContainer"></div>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const followersData = [
+let followersData = [
   { date: "2025-05-10", followers: 24000 },
   { date: "2025-06-01", followers: 29000 },
   { date: "2025-07-01", followers: 35300 },
@@ -85,107 +132,120 @@ const followersData = [
   { date: "2025-08-10", followers: 37817 }
 ];
 
-const ctx = document.getElementById("followersChart").getContext("2d");
-let chart;
+let currentRange = 365;
 
-function formatDate(d) {
-  const dt = new Date(d);
-  return dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+function filterByRange(data, days) {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - days);
+  return data.filter(d => {
+    const dt = new Date(d.date);
+    return dt >= startDate && dt <= endDate;
+  });
 }
 
 function updateHistory() {
   const ul = document.getElementById("followersHistory");
   ul.innerHTML = "";
-  followersData.slice().reverse().forEach(e => {
+  const filteredData = filterByRange(followersData, currentRange);
+  filteredData.slice().reverse().forEach(entry => {
     const li = document.createElement("li");
-    li.textContent = `${formatDate(e.date)} : ${e.followers.toLocaleString()} abonnés`;
+    li.textContent = formatDate(entry.date);
+    const span = document.createElement("span");
+    span.textContent = entry.followers.toLocaleString("fr-FR");
+    li.appendChild(span);
     ul.appendChild(li);
   });
 }
 
+const ctx = document.getElementById("followersChart").getContext("2d");
+let chart;
+
 function updateChart() {
   if (chart) chart.destroy();
+  const filteredData = filterByRange(followersData, currentRange);
   chart = new Chart(ctx, {
-    type: 'line',
+    type: "line",
     data: {
-      labels: followersData.map(e => formatDate(e.date)),
+      labels: filteredData.map(d => formatDate(d.date)),
       datasets: [{
         label: "Followers",
-        data: followersData.map(e => e.followers),
+        data: filteredData.map(d => d.followers),
         borderColor: "#ddd",
-        backgroundColor: "rgba(221,221,221,0.3)",
+        backgroundColor: "rgba(221, 221, 221, 0.3)",
         fill: true,
         tension: 0.3,
-        borderWidth: 2,
-        pointRadius: 3,
-        pointHoverRadius: 6
+        borderWidth: 3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
       }]
     },
-    options: {responsive:true, maintainAspectRatio:false}
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: "#aaa" }, grid: { color: "rgba(255,255,255,0.05)" } },
+        y: { ticks: { color: "#aaa" }, grid: { color: "rgba(255,255,255,0.1)" } }
+      }
+    }
   });
 }
 
-function addFollower(val) {
-  const today = new Date().toISOString().slice(0,10);
-  const idx = followersData.findIndex(d => d.date === today);
-  if (idx !== -1) followersData[idx].followers = val;
-  else followersData.push({date: today, followers: val});
-  followersData.sort((a,b) => new Date(a.date) - new Date(b.date));
-  updateHistory();
-  updateChart();
+function calculateStats() {
+  const filteredData = filterByRange(followersData, currentRange);
+  if (filteredData.length < 2) return { gain: 0 };
+  return {
+    gain: filteredData[filteredData.length - 1].followers - filteredData[0].followers
+  };
 }
 
-function generateShareImage() {
-  // Crée un canvas temporaire pour l’image de partage
-  const canvas = document.createElement("canvas");
-  canvas.width = 600;
-  canvas.height = 300;
-  const ctx = canvas.getContext("2d");
-
-  // Fond
-  ctx.fillStyle = "#121212";
-  ctx.fillRect(0,0,canvas.width, canvas.height);
-
-  // Titre
-  ctx.fillStyle = "#ddd";
-  ctx.font = "24px Arial";
-  ctx.fillText("KX CHR Followers Summary", 20, 40);
-
-  // Dernière date et valeur
-  const last = followersData[followersData.length-1];
-  ctx.font = "20px Arial";
-  ctx.fillText(`Date : ${formatDate(last.date)}`, 20, 90);
-  ctx.fillText(`Followers : ${last.followers.toLocaleString()}`, 20, 130);
-
-  // Gain total
-  const gain = last.followers - followersData[0].followers;
-  ctx.fillText(`Gain total : ${gain.toLocaleString()}`, 20, 170);
-
-  return canvas.toDataURL("image/png");
+function updateStats() {
+  const stats = calculateStats();
+  const container = document.getElementById("statsContainer");
+  container.innerHTML = `<div>Gain total abonnés sur la période : <strong>${stats.gain.toLocaleString("fr-FR")}</strong></div>`;
 }
 
-document.getElementById("addFollowerBtn").addEventListener("click", () => {
-  const val = parseInt(document.getElementById("followersInput").value);
-  if (isNaN(val) || val <= 0) {
-    alert("Merci d'entrer un nombre valide");
-    return;
-  }
-  addFollower(val);
-  document.getElementById("followersInput").value = "";
+document.querySelectorAll(".btn").forEach(btn => {
+  btn.addEventListener("click", e => {
+    document.querySelectorAll(".btn").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    currentRange = parseInt(e.target.dataset.range);
+    updateHistory();
+    updateChart();
+    updateStats();
+  });
 });
 
-document.getElementById("shareBtn").addEventListener("click", () => {
-  const imgData = generateShareImage();
-  const shareDiv = document.getElementById("shareLink");
-  shareDiv.style.display = "block";
-  shareDiv.innerHTML = `<img src="${imgData}" alt="Résumé KX CHR Followers" style="max-width:100%; border-radius:12px;"/>` +
-    `<p>Copie ce lien et partage-le :</p>` +
-    `<input type="text" style="width:100%; font-size: 0.9em;" readonly value="data:image/png;base64,${imgData.split(",")[1]}" />`;
+document.getElementById("addFollowerBtn").addEventListener("click", () => {
+  const input = document.getElementById("followersInput");
+  const val = parseInt(input.value);
+  if (isNaN(val) || val <= 0) {
+    alert("Merci d'entrer un nombre valide.");
+    return;
+  }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const existingIndex = followersData.findIndex(d => d.date === todayStr);
+  if (existingIndex !== -1) {
+    followersData[existingIndex].followers = val;
+  } else {
+    followersData.push({ date: todayStr, followers: val });
+  }
+  followersData.sort((a, b) => new Date(a.date) - new Date(b.date));
+  updateHistory();
+  updateChart();
+  updateStats();
+  input.value = "";
 });
 
 window.onload = () => {
   updateHistory();
   updateChart();
+  updateStats();
 };
 </script>
 </body>
