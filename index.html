@@ -74,11 +74,8 @@
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbwHRegOq9cp6XAKfyXCeYrYzp0ii8GhVzBpU55VZw-KsunzagnLUKyS6bBrkSaLTRUG/exec";
-
-const localData = [
+let followersData = [
   { date: "2025-05-10", followers: 24000 },
   { date: "2025-06-01", followers: 29000 },
   { date: "2025-07-01", followers: 35300 },
@@ -92,75 +89,12 @@ const localData = [
   { date: "2025-08-10", followers: 37817 }
 ];
 
-let followersData = [];
-
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
-async function pushMissingDataToSheet(sheetData) {
-  const sheetDates = new Set(sheetData.map(d => d.date));
-  const missingData = localData.filter(d => !sheetDates.has(d.date));
-
-  for (const entry of missingData) {
-    try {
-      await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entry)
-      });
-    } catch (e) {
-      console.error("Erreur en poussant la donnée:", entry, e);
-    }
-  }
-}
-
-async function fetchFollowersAndSync() {
-  try {
-    const res = await fetch(API_URL);
-    const sheetData = await res.json();
-
-    await pushMissingDataToSheet(sheetData);
-
-    const refreshed = await fetch(API_URL);
-    followersData = await refreshed.json();
-    followersData.sort((a,b) => new Date(a.date) - new Date(b.date));
-
-    renderHistory();
-    updateChart();
-    updateStats();
-  } catch (e) {
-    alert("Erreur de chargement des données.");
-    console.error(e);
-  }
-}
-
-async function addFollowerEntry(followers) {
-  if (!followers || isNaN(followers) || followers <= 0) {
-    alert("Merci d'entrer un nombre valide.");
-    return;
-  }
-  const todayStr = new Date().toISOString().slice(0, 10);
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: todayStr, followers })
-    });
-    const result = await res.json();
-    if (result.status === "success") {
-      await fetchFollowersAndSync();
-    } else {
-      alert("Erreur lors de l'ajout des données.");
-    }
-  } catch (e) {
-    alert("Erreur de connexion à la feuille.");
-    console.error(e);
-  }
-}
-
-function renderHistory() {
+function updateHistory() {
   const ul = document.getElementById("followersHistory");
   ul.innerHTML = "";
   followersData.slice().reverse().forEach(entry => {
@@ -174,11 +108,11 @@ function renderHistory() {
 }
 
 const ctx = document.getElementById("followersChart").getContext("2d");
-let followersChart;
+let chart;
 
 function updateChart() {
-  if (followersChart) followersChart.destroy();
-  followersChart = new Chart(ctx, {
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
     type: "line",
     data: {
       labels: followersData.map(d => d.date),
@@ -197,24 +131,19 @@ function updateChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: "#ccc", font: { weight: "600", size: 14 } } },
-        tooltip: { backgroundColor: "rgba(0,0,0,0.7)", titleColor: "#ddd", bodyColor: "#eee" },
-        zoom: { pan: { enabled: true, mode: "x", modifierKey: "ctrl" }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "x" } }
-      },
       scales: {
         x: { ticks: { color: "#aaa" }, grid: { color: "rgba(255,255,255,0.05)" } },
         y: { ticks: { color: "#aaa" }, grid: { color: "rgba(255,255,255,0.1)" } }
       }
-    },
-    plugins: [ChartZoom]
+    }
   });
 }
 
 function calculateStats() {
   if (followersData.length < 2) return { gain: 0 };
-  const gain = followersData[followersData.length - 1].followers - followersData[0].followers;
-  return { gain };
+  return {
+    gain: followersData[followersData.length - 1].followers - followersData[0].followers
+  };
 }
 
 function updateStats() {
@@ -224,20 +153,32 @@ function updateStats() {
 }
 
 document.getElementById("addFollowerBtn").addEventListener("click", () => {
-  const val = parseInt(document.getElementById("followersInput").value);
-  addFollowerEntry(val);
-  document.getElementById("followersInput").value = "";
-});
-
-document.getElementById("followersInput").addEventListener("keydown", e => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    document.getElementById("addFollowerBtn").click();
+  const input = document.getElementById("followersInput");
+  const val = parseInt(input.value);
+  if (isNaN(val) || val <= 0) {
+    alert("Merci d'entrer un nombre valide.");
+    return;
   }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  // Ajoute ou met à jour la donnée du jour
+  const existingIndex = followersData.findIndex(d => d.date === todayStr);
+  if (existingIndex !== -1) {
+    followersData[existingIndex].followers = val;
+  } else {
+    followersData.push({ date: todayStr, followers: val });
+  }
+  followersData.sort((a, b) => new Date(a.date) - new Date(b.date));
+  updateHistory();
+  updateChart();
+  updateStats();
+  input.value = "";
 });
 
-// Chargement initial + sync
-fetchFollowersAndSync();
+window.onload = () => {
+  updateHistory();
+  updateChart();
+  updateStats();
+};
 </script>
 </body>
 </html>
